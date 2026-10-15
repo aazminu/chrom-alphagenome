@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import random
+import sys
 from pathlib import Path
 from typing import Any, Dict, List, Sequence
 
@@ -12,7 +14,7 @@ from .splice_sashimi import MaxEntSashimiAnalyzer
 
 def run_benchmark(seed: int = 42) -> List[Dict[str, Any]]:
     """Run reproducible regulatory prioritization, MaxEntScan Sashimi splice, and ChromBPNet ISM benchmarks."""
-    _ = seed
+    rng = random.Random(seed)
 
     # 1. Regulatory variant cohort prioritization
     prioritizer = RegulatoryPrioritizer(af_threshold=1e-4)
@@ -24,7 +26,7 @@ def run_benchmark(seed: int = 42) -> List[Dict[str, Any]]:
                 ref="A",
                 alt="G",
                 gene="HBB",
-                alphagenome_rna_q=0.310,
+                alphagenome_rna_q=0.310 + rng.uniform(-0.01, 0.01),
                 alphagenome_splice_q=0.215,
                 alphagenome_atac_q=0.290,
                 gnomad_af=0.045,
@@ -38,9 +40,9 @@ def run_benchmark(seed: int = 42) -> List[Dict[str, Any]]:
                 gene="HBB",
                 alphagenome_rna_q=0.994,
                 alphagenome_splice_q=0.998,
-                alphagenome_atac_q=0.812,
+                alphagenome_atac_q=0.812 + rng.uniform(-0.02, 0.02),
                 gnomad_af=1.2e-5,
-                motif_delta_llr=-6.4,
+                motif_delta_llr=-6.4 + rng.uniform(-0.2, 0.2),
             ),
         ]
     )
@@ -58,10 +60,12 @@ def run_benchmark(seed: int = 42) -> List[Dict[str, Any]]:
 
     # 3. ChromBPNet Tn5-debiased ISM & TF motif disruption
     attributor = ChromBPNetISMAttributor()
+    base_counts = [10.0, 12.0, 15.0, 42.0, 55.0, 48.0, 50.0, 44.0, 38.0, 18.0, 14.0, 11.0]
+    sampled_counts = [c + rng.uniform(-0.4, 0.4) for c in base_counts]
     ism_res = attributor.compute_ism_attribution(
         "CCCAGATAAGGG",
         "CCCACATAAGGG",
-        [10.0, 12.0, 15.0, 42.0, 55.0, 48.0, 50.0, 44.0, 38.0, 18.0, 14.0, 11.0],
+        sampled_counts,
     )
     motif_name = ism_res.top_motif_hit.motif_name if ism_res.top_motif_hit else "NONE"
     motif_llr = ism_res.top_motif_hit.delta_llr if ism_res.top_motif_hit else 0.0
@@ -88,10 +92,10 @@ def run_benchmark(seed: int = 42) -> List[Dict[str, Any]]:
         {
             "benchmark": "chrombpnet_tn5_ism_attribution",
             "locus": f"HBB_enhancer:{motif_name}",
-            "primary_metric": "motif_delta_llr",
-            "score": round(motif_llr, 4),
-            "secondary_metric": "core_G4C_ism",
-            "secondary_value": round(ism_res.ism_matrix[4]["C"], 4),
+            "primary_metric": "debiased_peak_count",
+            "score": round(max(ism_res.debiased_footprint_profile), 4),
+            "secondary_metric": "motif_delta_llr",
+            "secondary_value": round(motif_llr, 4),
             "mechanism": "MotifDisrupted" if (ism_res.top_motif_hit and ism_res.top_motif_hit.disrupted) else "Intact",
         },
     ]
@@ -147,8 +151,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         else format_markdown_table(rows)
     )
     if args.output is not None:
-        args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered + "\n", encoding="utf-8")
+        try:
+            args.output.parent.mkdir(parents=True, exist_ok=True)
+            args.output.write_text(rendered + "\n", encoding="utf-8")
+        except OSError as exc:
+            print(f"Error writing output to {args.output}: {exc}", file=sys.stderr)
+            return 1
     print(rendered)
     return 0
 
