@@ -67,3 +67,44 @@ def test_ism_edge_cases() -> None:
     with pytest.raises(ValueError, match="site_type"):
         analyzer.evaluate_splice_window("v1", "ACGTACAGGTAAGT", "ACGTACAGGTAAGT", 4, site_type="invalid")
 
+
+def test_cli_benchmark_markdown_json_and_reproducibility(
+    capsys: pytest.CaptureFixture[str], tmp_path: pytest.TempPathFactory
+) -> None:
+    import json
+    import subprocess
+    import sys
+    from pathlib import Path
+    from chrom_alphagenome.__main__ import format_markdown_table, main, run_benchmark
+
+    rows_1 = run_benchmark(seed=42)
+    rows_2 = run_benchmark(seed=42)
+    assert rows_1 == rows_2
+    assert len(rows_1) == 3
+
+    md = format_markdown_table(rows_1)
+    assert "| benchmark | locus | primary_metric | score |" in md
+    assert "maxent_sashimi_donor_disruption" in md
+    assert "chrombpnet_tn5_ism_attribution" in md
+
+    out_path = Path(str(tmp_path)) / "chrom_bench.json"
+    rc = main(["--format", "json", "--seed", "42", "--output", str(out_path)])
+    assert rc == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["seed"] == 42
+    assert data["benchmarks"] == rows_1
+    assert json.loads(out_path.read_text(encoding="utf-8")) == data
+
+    repo_root = Path(__file__).resolve().parents[1]
+    proc = subprocess.run(
+        [sys.executable, str(repo_root / "scripts" / "benchmark.py"), "--format", "markdown"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert "regulatory_cohort_prioritization" in proc.stdout
+
+    with pytest.raises(SystemExit):
+        main(["--format", "invalid_fmt"])
+
+
