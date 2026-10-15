@@ -102,6 +102,8 @@ class MaxEntSashimiAnalyzer:
             raise ValueError("ref_window and alt_window must have equal length >= 9")
         if canonical_offset < 0 or canonical_offset + 9 > len(ref_clean):
             raise ValueError("canonical_offset out of bounds for 9-mer window")
+        if site_type not in ("donor", "acceptor"):
+            raise ValueError("site_type must be 'donor' or 'acceptor'")
 
         scorer = self.score_donor_9mer if site_type == "donor" else self.score_acceptor_9mer
         ref_score = scorer(ref_clean[canonical_offset : canonical_offset + 9])

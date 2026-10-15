@@ -49,6 +49,11 @@ def test_chrombpnet_tn5_debiasing_and_gata1_motif_disruption() -> None:
     assert res.top_motif_hit.motif_name == "GATA1"
     assert res.top_motif_hit.disrupted is True
     assert res.top_motif_hit.delta_llr < -4.0
+    # Position 4 is core G in AGATAA; G>C transversion must have strongly negative ISM attribution
+    assert res.ism_matrix[4]["G"] == 0.0
+    assert res.ism_matrix[4]["C"] < -5.0
+    assert res.ism_matrix[4]["A"] < -5.0
+    assert res.ism_matrix[4]["T"] < -5.0
 
 
 def test_ism_edge_cases() -> None:
@@ -57,3 +62,8 @@ def test_ism_edge_cases() -> None:
         attributor.debias_tn5_profile("", [])
     with pytest.raises(ValueError):
         attributor.debias_tn5_profile("ACGT", [1.0, -2.0, 3.0, 4.0])
+
+    analyzer = MaxEntSashimiAnalyzer()
+    with pytest.raises(ValueError, match="site_type"):
+        analyzer.evaluate_splice_window("v1", "ACGTACAGGTAAGT", "ACGTACAGGTAAGT", 4, site_type="invalid")
+

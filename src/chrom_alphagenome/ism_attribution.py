@@ -123,6 +123,31 @@ class ChromBPNetISMAttributor:
         hits.sort(key=lambda h: abs(h.delta_llr), reverse=True)
         return hits
 
+    def _single_base_motif_delta(self, seq: str, pos: int, mut_base: str) -> float:
+        """Return the strongest motif log-likelihood ratio change induced by mutating seq[pos] -> mut_base."""
+        mut_seq = seq[:pos] + mut_base + seq[pos + 1 :]
+        best_delta = 0.0
+        for pwm in TF_MOTIF_PWMS.values():
+            k = len(pwm)
+            if len(seq) < k:
+                continue
+            start_min = max(0, pos - k + 1)
+            start_max = min(pos, len(seq) - k)
+            for offset in range(start_min, start_max + 1):
+                r_sub = seq[offset : offset + k]
+                m_sub = mut_seq[offset : offset + k]
+                for r_kmer, m_kmer in (
+                    (r_sub, m_sub),
+                    (self._revcomp(r_sub), self._revcomp(m_sub)),
+                ):
+                    r_llr = self._score_pwm(r_kmer, pwm)
+                    m_llr = self._score_pwm(m_kmer, pwm)
+                    if max(r_llr, m_llr) >= 2.0:
+                        delta = m_llr - r_llr
+                        if abs(delta) > abs(best_delta):
+                            best_delta = delta
+        return best_delta
+
     def compute_ism_attribution(
         self,
         ref_seq: str,
@@ -137,14 +162,14 @@ class ChromBPNetISMAttributor:
         ism_matrix: List[Dict[str, float]] = []
         for i, ref_base in enumerate(clean_ref):
             row: Dict[str, float] = {}
+            access_scale = math.log1p(debiased[i])
             for mut_base in ("A", "C", "G", "T"):
                 if mut_base == ref_base:
                     row[mut_base] = 0.0
                 else:
-                    gc_shift = (1.0 if mut_base in ("G", "C") else -1.0) - (
-                        1.0 if ref_base in ("G", "C") else -1.0
-                    )
-                    row[mut_base] = round(0.15 * gc_shift * math.log1p(debiased[i]), 4)
+                    motif_delta = self._single_base_motif_delta(clean_ref, i, mut_base)
+                    base_bias_delta = TN5_BASE_WEIGHTS[mut_base] - TN5_BASE_WEIGHTS[ref_base]
+                    row[mut_base] = round((0.25 * motif_delta + 0.15 * base_bias_delta) * access_scale, 4)
             ism_matrix.append(row)
 
         return ISMAttributionResult(
@@ -153,3 +178,4 @@ class ChromBPNetISMAttributor:
             ism_matrix=ism_matrix,
             top_motif_hit=top_hit,
         )
+
