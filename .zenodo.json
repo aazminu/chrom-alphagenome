@@ -1,0 +1,31 @@
+{
+  "title": "ChromAlphaGenome: Multi-Modal Non-Coding Variant Prioritization, Chromatin Accessibility Modeling & Splice-Disruption Pipeline",
+  "upload_type": "software",
+  "description": "ChromAlphaGenome is a reproducible regulatory genomics package developed by the Computational Genomics & Agentic Systems (CGAS) Lab at Northwestern University. It harmonizes 1-megabase cis-regulatory track predictions from the AlphaGenome atlas with ChromBPNet base-resolution chromatin accessibility foot-printing and MaxEntScan donor/acceptor splice-site disruption (ΔPSI) modeling across ClinVar, gnomAD v4, and ENCODE cCRE benchmarks.",
+  "creators": [
+    {
+      "name": "Azmi, Abdullah",
+      "affiliation": "Northwestern University, Department of Computer Science & NICO",
+      "orcid": "0009-0005-2720-3347"
+    }
+  ],
+  "keywords": [
+    "Computational Genomics",
+    "AlphaGenome",
+    "Variant Prioritization",
+    "Chromatin Accessibility",
+    "ChromBPNet",
+    "Splice Disruption",
+    "MaxEntScan",
+    "ClinVar",
+    "gnomAD"
+  ],
+  "license": "Apache-2.0",
+  "related_identifiers": [
+    {
+      "identifier": "https://abdullahazmi.com/lab/",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    }
+  ]
+}
